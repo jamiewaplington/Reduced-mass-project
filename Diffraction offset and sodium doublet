@@ -1,0 +1,49 @@
+#Sodium doublet calculation
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+rad = (2 * np.pi) / 360
+
+# converts from degrees and arcseconds to degrees and decimals
+def angle(x, y):
+    return x + (y / 60)
+
+
+data = pd.read_csv('csv.csv')
+
+#following sections of code calculate offset of diffraction grating from perpendicular
+
+#absolute angles on left and right of centre
+data["AlphaPos"] = angle(data["degreesleft"], data["arcsecsleft"]) + (360-angle(data["midpointdeg"], data["midpointsec"]))
+data["AlphaNeg"] = -1*(angle(data["midpointdeg"], data["midpointsec"]) - angle(data["degreesright"], data["arcsecsright"]))
+
+#function accounting for grating offset from perpendicular
+def beta(alphaNeg, alphaPos):
+    return (np.sin(alphaPos * rad) + np.sin(alphaNeg * rad))/(2 + np.cos(alphaNeg * rad) + np.cos(alphaPos * rad))
+
+#calculating offset     
+data["beta"] = beta(data["AlphaNeg"], data["AlphaPos"]) * rad**-1
+
+#defining angles modified for grating offset
+data["ThetaNeg"] = data["AlphaNeg"] - data["beta"]
+data["ThetaPos"] = data["AlphaPos"] - data["beta"]
+
+#next section calculates diffraction spacing from sodium doublet
+left, right = [x for _, x in data.groupby(data['noprotons'] < 1)]
+left.reset_index(inplace = True, drop = True)
+
+left["d"] = (5889.950e-10/(np.sin(data["ThetaPos"] * rad) - np.sin(data["ThetaNeg"] * rad)))
+right["d"] = (5895.924e-10/(np.sin(data["ThetaPos"] * rad) - np.sin(data["ThetaNeg"] * rad)))
+
+#calculates average values of diffraction spacing for each doublet line
+leftavg = left["d"]
+rightavg = right["d"]
+average = 10e6*2*leftavg.append(rightaverage)
+
+#final values
+averagespacing = np.mean(average)
+averageuncertainty = np.std(averagespacing)
+
